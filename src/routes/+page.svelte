@@ -1,5 +1,7 @@
-<script>
+<script lang="js">
+  import { page } from '$app/state';
 
+  const socket_url = page.data.socket_url;
 </script>
 
 <title>SecureChat</title>
