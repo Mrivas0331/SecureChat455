@@ -6,7 +6,7 @@ export const load = async (event) => {
         (obj, item) => Object.assign(obj, { [item.name]: item.value }),
         {}
       ),
-    // This is the important one to change
-    socket_url: "https://localhost:5454",
+    // Make sure to change this if necessary
+    socket_url: "wss://45.49.193.179:49153/",
   };
 };
