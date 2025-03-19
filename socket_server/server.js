@@ -1,6 +1,7 @@
 const express = require("express");
 const https = require("https");
 const socketIo = require("socket.io");
+const bcrypt = require("bcrypt");
 const sqlite3 = require("sqlite3").verbose();
 const crypto = require("crypto");
 const fs = require("fs");
@@ -48,7 +49,7 @@ app.post("/signup", (req, res) => {
     "\nHTTPS Signup request:",
     JSON.stringify({ username, password }, null, 2)
   );
-
+    //when user doesnt submit either or
   if (!username || !password) {
     console.log("Recieved a bad request on /signup");
     return res.status(400).send("Missing username or password");
@@ -80,6 +81,66 @@ app.post("/signup", (req, res) => {
     );
   } catch (error) {
     console.error("Signup error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+app.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  console.log(
+    "\nHTTPS Login request:",
+    JSON.stringify({ username, password }, null, 2)
+  );
+
+  if (!username || !password) {
+    console.log("Recieved a bad request on /login");
+    return res.status(400).send("Missing username or password");
+  }
+
+  try {
+    db.get( //accesses database to find user
+      "SELECT id, session_token FROM users WHERE username = ?",
+      [username],
+      async (err, row) => {
+        if (err) {
+          console.error("Error selecting user:", err.message);
+          return res.status(500).json({ error: "Internal server error." });
+        }
+        //when not found
+        if (!row) {
+          console.log("User not found, rejecting login.");
+          return res.status(400).json({ error: "User not found." });
+        }
+        //compares hashed passwords
+        const matches = await bcrypt.compare(password, row.id);
+
+        if (!matches) {
+          console.log("Password incorrect, rejecting login.");
+          return res.status(400).json({ error: "Password incorrect." });
+        }
+
+        const newSessionToken = crypto.randomBytes(64).toString("hex");
+        const lastlogin = new Date().toISOString();
+
+        db.run(
+          "UPDATE users SET session_token = ?, lastlogin = ? WHERE username = ?",
+          [newSessionToken, lastlogin, username],
+          function (err) {
+            if (err) {
+              console.error("Error updating user:", err.message);
+              return res.status(500).json({ error: "Internal server error." });
+            }
+            console.log(`A row has been updated with rowid ${this.lastID}`);
+            console.log("User logged in successfully.");
+            res.status(200).json({
+              message: "Logged in successfully.",
+              session_token: newSessionToken,
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error." });
   }
 });
