@@ -34,16 +34,14 @@ Then, point the frontend to the new backend endpoint by changing the file `src/r
 
 ```js
 export const load = async (event) => {
-  return {
-    cookies: event.cookies
-      .getAll()
-      .reduce(
-        (obj, item) => Object.assign(obj, { [item.name]: item.value }),
-        {}
-      ),
-    // This is the important one to change
-    socket_url: "https://localhost:5454",
-  };
+  const { cookies } = event;
+  let socket_url = "wss://45.49.193.179:49153/"; // prod
+
+  // Uncomment these for dev variables
+  // process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+  // socket_url = "https://localhost:5433/";
+
+  // ...
 };
 ```
 

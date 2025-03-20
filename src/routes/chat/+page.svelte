@@ -4,7 +4,7 @@
   import { io } from "socket.io-client";
 
   const username = page.data.username;
-  const session = page.data.session;
+  const session = page.data.session_token;
   const socket_url = page.data.socket_url;
 
   let msgInputField = "";
@@ -100,11 +100,39 @@
   onMount(() => {
     verifyFlash();
 
+    // Connect to socket server
     const socket = io(socket_url, {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 3000,
       transports: ["websocket"],
+    });
+
+    // Handle disconnects
+    socket.on("disconnect", (reason) => {
+      return;
+      if (reason === "io server disconnect") {
+        alert("You have been disconnected from the server for session timeout");
+        window.location.href = "/login";
+      } else if (reason === "io client disconnect") {
+        alert("You successfully disconnected from the server");
+        window.location.href = "/";
+      } else {
+        alert(
+          "You have been disconnected from the server for an unknown reason"
+        );
+        window.location.href = "/login";
+      }
+    });
+
+    // Verify on connection start
+    socket.on("connect", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log("Connected to server");
+      socket.emit(
+        "verify",
+        JSON.stringify({ username, session_token: session })
+      );
     });
 
     console.log("Added max");

@@ -26,7 +26,6 @@ export const actions = {
     const hashedPassword = await hash(password, 10);
 
     // Make HTTPS Request to express server
-    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0; // IMPORTANT | This is insecure and is only here for testing with our self-signed certs. Remove when signed with a CA.
     let https_url = ws_url.replace("wss://", "https://");
     if (https_url.endsWith("/")) {
       https_url = https_url.slice(0, -1);

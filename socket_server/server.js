@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const env = JSON.parse(fs.readFileSync("env.json", "utf8"));
 
+// Server Setup
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -30,7 +31,7 @@ const db = new sqlite3.Database("./secure_chat.db", (err) => {
 function getReqIp(req) {
   const forwardedFor = req.headers["x-forwarded-for"];
   if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim();
+    return forwardedFor.split(",")[0].trim();
   }
   return req.ip;
 }
@@ -198,7 +199,7 @@ app.post("/verify", (req, res) => {
 
         const lastLoginTime = new Date(row.lastlogin).getTime();
         const currentTime = Date.now();
-        const expiresIn = 48 * 60 * 60 * 1000 ; // 48 hours
+        const expiresIn = 48 * 60 * 60 * 1000; // 48 hours
 
         if (currentTime - lastLoginTime > expiresIn) {
           console.log("Session expired, rejecting verify.");
@@ -217,7 +218,10 @@ app.post("/verify", (req, res) => {
               return res.status(500).json({ error: "Internal server error." });
             }
             console.log(`A row has been updated with rowid ${row.id}`);
-            console.log("User verified successfully.");
+            console.log(
+              "User verified successfully, gave new session token:",
+              newSessionToken
+            );
             res.status(200).json({
               message: "Verified successfully.",
               session_token: newSessionToken,
@@ -233,11 +237,70 @@ app.post("/verify", (req, res) => {
   }
 });
 
+function verifyUserAndSession(socket_message) {
+  if (typeof socket_message !== "object") {
+    return false;
+  }
+  const { username, session_token } = socket_message;
+  if (!username || !session_token) {
+    return false;
+  }
+  try {
+    console.log("Verifying user and session:", username, session_token);
+    db.run(
+      "SELECT * FROM users WHERE username = ? AND session_token = ?",
+      [username, session_token],
+      (err, row) => {
+        if (err) {
+          return false;
+        }
+        if (!row) {
+          return false;
+        }
+        return true;
+      }
+    );
+  } catch (error) {
+    console.log("Verify error:", error);
+    return false;
+  }
+}
+
 // Socket.IO Events
+// user_memory stores { username: { socket_id, session_token } }
+const user_memory = new Map();
 io.on("connection", (socket) => {
+  // All socket messages are in the expected format of:
+  // { username, sesson_token, event, ...other_info_related_to_event }
   console.log("Client connected:", socket.id);
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
+  });
+  const verifyTimeout = setTimeout(() => {
+    console.log(`Client ${socket.id} did not verify in time.`);
+    socket.disconnect(true);
+  }, 10 * 1000);
+
+  // Clients must send the "verify" event first to authenticate. It must have:
+  // { username, session_token }
+  socket.on("verify", (verification) => {
+    clearTimeout(verifyTimeout);
+    let verificationinfo = null;
+    try {
+      verificationinfo = JSON.parse(verification);
+    } catch (error) {
+      console.log("Error parsing verification:", error);
+      socket.disconnect(true);
+      return;
+    }
+    console.log(`Client ${socket.id} sent verification:`, verificationinfo);
+    if (!verifyUserAndSession(verificationinfo)) {
+      console.log(`Client ${socket.id} failed verification.`);
+      socket.disconnect(true);
+      return;
+    }
+
+    // Client passed socket verification, store their info and attach new events
   });
 });
 
