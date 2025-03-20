@@ -123,4 +123,76 @@
 
 <title>SecureChat | Chat</title>
 
-<h1>Logged in as {username || '???'}</h1>
+<h1>Logged in as {username || "???"}</h1>
+<br />
+
+<h3>Pick someone to chat with:</h3>
+<br />
+
+<div class="chats-selection">
+  {#each chats as chat}
+    <button
+      style={(
+        chat.user1 === username
+          ? chat.user2 === chatting_with
+          : chat.user1 === chatting_with
+      )
+        ? "text-decoration: underline; margin: 5px;"
+        : "margin: 5px;"}
+      onclick={() =>
+        (chatting_with = chat.user1 === username ? chat.user2 : chat.user1)}
+      aria-pressed="false"
+      tabindex="0"
+      onkeydown={(e) => {
+        if (e.key === "Enter") {
+          chatting_with = chat.user1 === username ? chat.user2 : chat.user1;
+        }
+      }}
+    >
+      {chat.user1 === username ? chat.user2 : chat.user1}
+    </button>
+  {/each}
+</div>
+<br />
+
+<!-- If "chatting_with" is not empty and there exists an entry in chats that has one of those users  -->
+{#each chats as chat}
+  {#if (chat.user1 === chatting_with || chat.user2 === chatting_with) && chatting_with !== ""}
+    <h3>Chatting with {chatting_with}</h3>
+    <br />
+    <div class="message-display">
+      {#each chat.messages as message}
+        <div>
+          <b>{message.sender}</b>: {message.content}
+        </div>
+      {/each}
+    </div>
+    <br />
+    <input
+      type="text"
+      bind:value={msgInputField}
+      placeholder="Type a message..."
+    />
+    <button>Send</button>
+  {/if}
+{/each}
+
+<style>
+  .chats-selection {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .message-display {
+    border: 1px solid black;
+    height: 40vh;
+    min-height: 200px;
+    width: 80vw;
+    max-width: 800px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+  }
+</style>
