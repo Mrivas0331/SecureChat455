@@ -30,7 +30,95 @@
     } else if (flashmsg === " error server") {
       alert("Internal Server Error");
     }
-  };
+  }
+
+  // Note that all chats are one-to-one. I.e. if I have a chat with a user named
+  // "hannah", then the chat object will contain all messages between me and
+  // "hannah".
+
+  /**
+   * The expected type of a single "message"
+   * @typedef {Object} Message
+   * @property {string} sender - The username of the sender
+   * @property {string} content - The content of the message
+   * @property {string} timestamp - The timestamp of the message
+   */
+
+  /**
+   * The expected type of a single "chat"
+   * @typedef {Object} Chat
+   * @property {string} user1 - The username of the first user. User 1 is decided by alphabetical order
+   * @property {string} user2 - The username of the second user. User 2 is decided by alphabetical order
+   * @property {Message[]} messages - An array of messages between the two users
+   * @property {string} user1_last_activity - The timestamp of the last typing activity of user 1
+   * @property {string} user2_last_activity - The timestamp of the last typing activity of user 2
+   * @property {bool} show_typing - Whether to show the typing indicator for the chat
+   */
+
+  /** @type {Chat[]} */
+  let chats = [];
+
+  let chatting_with = "";
+
+  // Run when a user goes online, adds a Chat object to the chats array
+  function userOnline(user, old_messages) {
+    chats.push({
+      user1: username < user ? username : user,
+      user2: username < user ? user : username,
+      messages: old_messages,
+      user1_last_activity: "",
+      user2_last_activity: "",
+      show_typing: false,
+    });
+    chats = [...chats];
+  }
+
+  // Run when a user goes offline, removes the Chat object from the chats array
+  function userOffline(user) {
+    const index = chats.findIndex(
+      (chat) => chat.user1 === user || chat.user2 === user
+    );
+    if (index !== -1) chats.splice(index, 1);
+    if (chatting_with === user) chatting_with = "";
+  }
+
+  // Run when a user sends a message, adds the message to the appropriate Chat object
+  function recvMessage(sender, reciever, message) {
+    const chat = chats.find(
+      (chat) =>
+        (chat.user1 === sender && chat.user2 === reciever) ||
+        (chat.user1 === reciever && chat.user2 === sender)
+    );
+    if (chat === undefined) {
+      return;
+    } else {
+      chat.messages.push({ sender, content: message });
+      chats = [...chats];
+    }
+  }
+
+  onMount(() => {
+    verifyFlash();
+
+    const socket = io(socket_url, {
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 3000,
+      transports: ["websocket"],
+    });
+
+    console.log("Added max");
+    userOnline("max", []);
+    console.log("Added mark");
+    userOnline("mark", []);
+    console.log("Added elzie");
+    userOnline("elzie", []);
+    // push 4 messages to hannah
+    recvMessage("max", username, "Hello");
+    recvMessage(username, "max", "How are you?");
+    recvMessage("max", username, "I'm good");
+    recvMessage(username, "max", "ok");
+  });
 </script>
 
 <title>SecureChat | Chat</title>
