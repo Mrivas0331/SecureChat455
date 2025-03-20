@@ -48,6 +48,9 @@ export const actions = {
     } else if (response.status === 400) {
       cookies.set("flash", "login | error wrong", { path: "/" });
       return JSON.stringify({});
+    } else if (response.status === 429) {
+      cookies.set("flash", "login | error limited", { path: "/" });
+      return JSON.stringify({});
     } else {
       cookies.set("flash", "signup | error server", { path: "/" });
       return JSON.stringify({});

@@ -26,6 +26,15 @@ const db = new sqlite3.Database("./secure_chat.db", (err) => {
   }
 });
 
+// Helper functions
+function getReqIp(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  return req.ip;
+}
+
 // Create initial database tables
 db.run(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -45,8 +54,9 @@ db.run(`
 // API Routes
 app.post("/signup", (req, res) => {
   const { username, password } = req.body;
+  const ip = getReqIp(req);
   console.log(
-    "\nHTTPS Signup request:",
+    "\nHTTPS Signup request from " + ip + ":",
     JSON.stringify({ username, password }, null, 2)
   );
 
@@ -84,17 +94,30 @@ app.post("/signup", (req, res) => {
     res.status(500).json({ error: "Internal server error." });
   }
 });
+const loginAttempts = new Map();
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
+  const ip = getReqIp(req);
+  const key = `${ip}:${username}`;
+  const now = Date.now();
+  const oneMinuteAgo = now - 60000;
   console.log(
-    "\nHTTPS Login request:",
-    JSON.stringify({ username, password }, null, 2)
+    "\nHTTPS Login request from " + ip + ":",
+    JSON.stringify({ username, password: "*".repeat(password.length) }, null, 2)
   );
 
   if (!username || !password) {
     console.log("Recieved a bad request on /login");
     return res.status(400).send("Missing username or password");
   }
+
+  let attempts = loginAttempts.get(key) || [];
+  attempts = attempts.filter((time) => time > oneMinuteAgo);
+  if (attempts.length >= 5) {
+    console.log("Too many login attempts, rejecting login.");
+    return res.status(429).json({ error: "Too many login attempts." });
+  }
+  loginAttempts.set(key, [...attempts, now]);
 
   try {
     db.get(

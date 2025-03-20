@@ -24,6 +24,8 @@
       alert('Error: Missing username or password');
     } else if (flashmsg === ' error wrong') {
       alert('Error: Username or Password is wrong');
+    } else if (flashmsg === ' error limited') {
+      alert('Error: Too many login attempts, try again in a few minutes');
     } else if (flashmsg === ' error server') {
       alert('Internal Server Error');
     }
