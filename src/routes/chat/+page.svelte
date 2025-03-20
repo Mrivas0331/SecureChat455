@@ -76,10 +76,11 @@
   // Run when a user goes offline, removes the Chat object from the chats array
   function userOffline(user) {
     const index = chats.findIndex(
-      (chat) => chat.user1 === user || chat.user2 === user
+      (chat) => chat.user1 === user || chat.user2 === user,
     );
     if (index !== -1) chats.splice(index, 1);
     if (chatting_with === user) chatting_with = "";
+    chats = [...chats];
   }
 
   // Run when a user sends a message, adds the message to the appropriate Chat object
@@ -87,7 +88,7 @@
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
-        (chat.user1 === reciever && chat.user2 === sender)
+        (chat.user1 === reciever && chat.user2 === sender),
     );
     if (chat === undefined) {
       return;

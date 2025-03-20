@@ -246,10 +246,9 @@ function verifyUserAndSession(socket_message) {
     return false;
   }
   try {
-    console.log("Verifying user and session:", username, session_token);
-    db.run(
-      "SELECT * FROM users WHERE username = ? AND session_token = ?",
-      [username, session_token],
+    return db.get(
+      "SELECT session_token FROM users WHERE username = ?",
+      [username],
       (err, row) => {
         if (err) {
           return false;
@@ -272,7 +271,7 @@ const user_memory = new Map();
 io.on("connection", (socket) => {
   // All socket messages are in the expected format of:
   // { username, sesson_token, event, ...other_info_related_to_event }
-  console.log("Client connected:", socket.id);
+  console.log("\nClient connected:", socket.id);
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
   });
@@ -283,6 +282,7 @@ io.on("connection", (socket) => {
 
   // Clients must send the "verify" event first to authenticate. It must have:
   // { username, session_token }
+  // The server only sends them things and listens to their events if they pass verification
   socket.on("verify", (verification) => {
     clearTimeout(verifyTimeout);
     let verificationinfo = null;
@@ -293,7 +293,7 @@ io.on("connection", (socket) => {
       socket.disconnect(true);
       return;
     }
-    console.log(`Client ${socket.id} sent verification:`, verificationinfo);
+    console.log(`Client ${socket.id} sent session info for verification.`);
     if (!verifyUserAndSession(verificationinfo)) {
       console.log(`Client ${socket.id} failed verification.`);
       socket.disconnect(true);
@@ -301,6 +301,7 @@ io.on("connection", (socket) => {
     }
 
     // Client passed socket verification, store their info and attach new events
+    //need to do still
   });
 });
 
