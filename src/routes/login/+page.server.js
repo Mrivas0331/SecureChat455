@@ -10,6 +10,9 @@ export const load = async (event) => {
   if (cookies.get("session")) {
     cookies.delete("session", { path: "/" });
   }
+  if (cookies.get("username")) {
+    cookies.delete("username", { path: "/" });
+  }
 };
 
 export const actions = {

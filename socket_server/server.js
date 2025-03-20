@@ -199,12 +199,15 @@ app.post("/verify", (req, res) => {
         const lastLoginTime = new Date(row.lastlogin).getTime();
         const currentTime = Date.now();
         const expiresIn = 48 * 60 * 60 * 1000 ; // 48 hours
+
         if (currentTime - lastLoginTime > expiresIn) {
           console.log("Session expired, rejecting verify.");
           return res.status(401).json({ error: "Session expired." });
         }
+
         const newSessionToken = crypto.randomBytes(64).toString("hex");
         const newLastLogin = new Date().toISOString();
+
         db.run(
           "UPDATE users SET session_token = ?, lastlogin = ? WHERE session_token = ?",
           [newSessionToken, newLastLogin, session_token],
@@ -229,6 +232,7 @@ app.post("/verify", (req, res) => {
     res.status(500).json({ error: "Internal server error." });
   }
 });
+
 // Socket.IO Events
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);

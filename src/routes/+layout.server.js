@@ -12,6 +12,6 @@ export const load = async (event) => {
         (obj, item) => Object.assign(obj, { [item.name]: item.value }),
         {}
       ),
-      socket_url
+    socket_url
   };
 };
