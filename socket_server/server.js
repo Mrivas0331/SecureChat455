@@ -49,7 +49,7 @@ app.post("/signup", (req, res) => {
     "\nHTTPS Signup request:",
     JSON.stringify({ username, password }, null, 2)
   );
-    //when user doesnt submit either or
+
   if (!username || !password) {
     console.log("Recieved a bad request on /signup");
     return res.status(400).send("Missing username or password");
@@ -97,7 +97,7 @@ app.post("/login", async (req, res) => {
   }
 
   try {
-    db.get( //accesses database to find user
+    db.get(
       "SELECT id, session_token FROM users WHERE username = ?",
       [username],
       async (err, row) => {
@@ -105,12 +105,12 @@ app.post("/login", async (req, res) => {
           console.error("Error selecting user:", err.message);
           return res.status(500).json({ error: "Internal server error." });
         }
-        //when not found
+
         if (!row) {
           console.log("User not found, rejecting login.");
           return res.status(400).json({ error: "User not found." });
         }
-        //compares hashed passwords
+
         const matches = await bcrypt.compare(password, row.id);
 
         if (!matches) {

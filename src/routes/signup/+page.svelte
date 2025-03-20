@@ -24,7 +24,7 @@
       if (confirm('Signup Successful! Want to go straight to chat?')) {
         window.location.href = '/chat';
       } else {
-        window.location.href='/';
+        window.location.href = '/';
       }
     } else if (flashmsg === ' error missing') {
       alert('Error: Missing username or password');

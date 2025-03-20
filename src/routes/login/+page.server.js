@@ -7,10 +7,13 @@ export const load = async (event) => {
   if (cookies.get("flash")) {
     cookies.delete("flash", { path: "/" });
   }
+  if (cookies.get("session")) {
+    cookies.delete("session", { path: "/" });
+  }
 };
 
 export const actions = {
-  signup: async (event) => {
+  login: async (event) => {
     const { request, cookies } = event;
 
     // Verify form data
@@ -19,11 +22,9 @@ export const actions = {
     const password = formData.get("password");
     const ws_url = formData.get("ws_url");
     if (!username || !password || !ws_url) {
-      cookies.set("flash", "signup | error missing", { path: "/" });
+      cookies.set("flash", "login | error missing", { path: "/" });
       return JSON.stringify({});
     }
-
-    const hashedPassword = await hash(password, 10);
 
     // Make HTTPS Request to express server
     process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0; // IMPORTANT | This is insecure and is only here for testing with our self-signed certs. Remove when signed with a CA.
@@ -31,22 +32,21 @@ export const actions = {
     if (https_url.endsWith("/")) {
       https_url = https_url.slice(0, -1);
     }
-    const response = await fetch(`${https_url}/signup`, {
+    const response = await fetch(`${https_url}/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username, password: hashedPassword }),
+      body: JSON.stringify({ username, password }),
     });
 
     // Interpret response
-    if (response.status === 201) {
+    if (response.status === 200) {
       const data = await response.json();
       cookies.set("session", data.session_token, { path: "/", maxAge: 172800 });
-      cookies.set("flash", "signup | successful", { path: "/" });
-      return JSON.stringify({});
+      return redirect(303, "/");
     } else if (response.status === 400) {
-      cookies.set("flash", "signup | error exists", { path: "/" });
+      cookies.set("flash", "login | error wrong", { path: "/" });
       return JSON.stringify({});
     } else {
       cookies.set("flash", "signup | error server", { path: "/" });

@@ -7,6 +7,7 @@
     password: '',
     ws_url: page.data.socket_url
   }
+
   onMount(() => {
     // Check for flash cookie
     const flash = page.data.cookies.flash;

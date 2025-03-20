@@ -7,6 +7,6 @@ export const load = async (event) => {
         {}
       ),
     socket_url: "wss://45.49.193.179:49153/", // prod
-    // socket_url: "https://localhost:5433/", // websocket url for development/self testing
+    // socket_url: "https://localhost:5433/", // dev
   };
 };
