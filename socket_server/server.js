@@ -236,22 +236,6 @@ app.post("/verify", (req, res) => {
 // Socket.IO Events
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
-
-  socket.on("message", (msg) => {
-    console.log("Received message:", msg, "from", socket.id);
-
-    // Store the message in the database
-    db.run("INSERT INTO messages (message) VALUES (?)", [msg], function (err) {
-      if (err) {
-        return console.error(err.message);
-      }
-      console.log(`A row has been inserted with rowid ${this.lastID}`);
-    });
-
-    // Mimic the message back
-    socket.emit("message", `Message stored: ${msg}`);
-  });
-
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
   });
