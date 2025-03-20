@@ -167,7 +167,68 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ error: "Internal server error." });
   }
 });
+app.post("/verify", (req, res) => {
+  const { session_token } = req.body;
+  const ip = getReqIp(req);
 
+  console.log(
+    "\nHTTPS Verify request from " + ip + ":",
+    JSON.stringify({ session_token }, null, 2)
+  );
+
+  if (!session_token) {
+    console.log("Recieved a bad request on /verify");
+    return res.status(400).send("Missing session_token");
+  }
+
+  try {
+    db.get(
+      "SELECT username, lastlogin FROM users WHERE session_token = ?",
+      [session_token],
+      async (err, row) => {
+        if (err) {
+          console.error("Error selecting user:", err.message);
+          return res.status(500).json({ error: "Internal server error." });
+        }
+
+        if (!row) {
+          console.log("Invalid session token, rejecting verify.");
+          return res.status(400).json({ error: "Invalid session token." });
+        }
+
+        const lastLoginTime = new Date(row.lastlogin).getTime();
+        const currentTime = Date.now();
+        const expiresIn = 48 * 60 * 60 * 1000 ; // 48 hours
+        if (currentTime - lastLoginTime > expiresIn) {
+          console.log("Session expired, rejecting verify.");
+          return res.status(401).json({ error: "Session expired." });
+        }
+        const newSessionToken = crypto.randomBytes(64).toString("hex");
+        const newLastLogin = new Date().toISOString();
+        db.run(
+          "UPDATE users SET session_token = ?, lastlogin = ? WHERE session_token = ?",
+          [newSessionToken, newLastLogin, session_token],
+          (err) => {
+            if (err) {
+              console.error("Error updating user:", err.message);
+              return res.status(500).json({ error: "Internal server error." });
+            }
+            console.log(`A row has been updated with rowid ${row.id}`);
+            console.log("User verified successfully.");
+            res.status(200).json({
+              message: "Verified successfully.",
+              session_token: newSessionToken,
+              username: row.username,
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.log("Verify error:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
 // Socket.IO Events
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
