@@ -30,7 +30,7 @@ export const actions = {
     let https_url = ws_url.replace("wss://", "https://");
     if (https_url.endsWith("/")) {
       https_url = https_url.slice(0, -1);
-    }
+    }//signing up 
     const response = await fetch(`${https_url}/signup`, {
       method: "POST",
       headers: {
