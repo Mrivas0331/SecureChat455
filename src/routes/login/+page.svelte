@@ -7,6 +7,26 @@
     password: '',
     ws_url: page.data.socket_url
   }
+  onMount(() => {
+    // Check for flash cookie
+    const flash = page.data.cookies.flash;
+    if (flash === undefined) return;
+    console.log(`Flash Cookie Found: ${flash}`);
+
+    // Check if flash cookie is valid for this page
+    if (flash.split('|').length !== 2) return;
+    if (flash.split('|')[0] !== 'login ') return;
+
+    // Interpret flash cookie
+    const flashmsg = flash.split('|')[1];
+    if (flashmsg === ' error missing') {
+      alert('Error: Missing username or password');
+    } else if (flashmsg === ' error wrong') {
+      alert('Error: Username or Password is wrong');
+    } else if (flashmsg === ' error server') {
+      alert('Internal Server Error');
+    }
+  });
 </script>
 
 <title>SecureChat | LogIn</title>
