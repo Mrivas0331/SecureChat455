@@ -22,6 +22,11 @@ export const actions = {
       cookies.set("flash", "signup | error missing", { path: "/" });
       return JSON.stringify({});
     }
+    
+    if (password.include("_") || username.include("_")) {
+      cookies.set("flash", "signup | error forbidden", { path: "/" });
+      return JSON.stringify({});
+    }
 
     const hashedPassword = await hash(password, 10);
 

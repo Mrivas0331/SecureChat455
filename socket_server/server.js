@@ -35,7 +35,24 @@ function getReqIp(req) {
   }
   return req.ip;
 }
-
+function tableExists(tableName, callback) {
+  db.get(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+    [tableName],
+    (err, row) => {
+      if (err) {
+        callback(err, null);
+        return;
+      }
+      callback(null, !!row);
+    }
+  );
+}
+function msgTableName(user1, user2) {
+  const fn = user1 > user2 ? user1 : user2;
+  const sn = user1 === fn ? user2 : user1;
+  return `${fn}_${sn}`;
+}
 // Create initial database tables
 db.run(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -317,7 +334,7 @@ io.on("connection", (socket) => {
 
     // Heartbeat code
     let heartbeatRecieved = true;
-    const interval = 30 * 1000 ; // 30 seconds per heartbeat
+    const interval = 30 * 1000; // 30 seconds per heartbeat
     const sendHeartbeat = () => {
       if (!heartbeatRecieved) {
         console.log(`Client ${socket.id} failed to respond to heartbeat.`);
@@ -348,24 +365,285 @@ io.on("connection", (socket) => {
     // Tell all clients that a new user has joined
     for (const [username, user] of user_memory) {
       if (username !== verificationinfo.username) {
-        io.to(user.socket_id).emit("join", JSON.stringify({ username: verificationinfo.username, messages: [] }));
+        const tablename = msgTableName(username, verificationinfo.username);
+        console.log(tablename);
+        tableExists(tablename, (err, exists) => {
+          if (err) {
+            return;
+          }
+          if (exists) {
+            db.all(
+              `SELECT * FROM ${tablename} ORDER BY id DESC LIMIT 20`,
+              (err, rows) => {
+                if (err) {
+                  console.error("Error selecting messages:", err.message);
+                  return;
+                }
+                const messages = rows.map((row) => ({
+                  sender: row.sender,
+                  content: row.message,
+                }));
+                io.to(user.socket_id).emit(
+                  "join",
+                  JSON.stringify({
+                    username: verificationinfo.username,
+                    messages: messages.reverse(),
+                  })
+                );
+              }
+            );
+          } else {
+            io.to(user.socket_id).emit(
+              "join",
+              JSON.stringify({
+                username: verificationinfo.username,
+                messages: [],
+              })
+            );
+          }
+        });
       }
     }
 
     // Tell this user all the other online users
     for (const [username, user] of user_memory) {
       if (username !== verificationinfo.username) {
-        socket.emit("join", JSON.stringify({ username, messages: [] }));
+        const tablename = msgTableName(username, verificationinfo.username);
+        tableExists(tablename, (err, exists) => {
+          if (err) {
+            return;
+          }
+          if (exists) {
+            db.all(
+              `SELECT * FROM ${tablename} ORDER BY id DESC LIMIT 20`,
+              (err, rows) => {
+                if (err) {
+                  console.error("Error selecting messages:", err.message);
+                  return;
+                }
+                const messages = rows.map((row) => ({
+                  sender: row.sender,
+                  content: row.message,
+                }));
+                socket.emit(
+                  "join",
+                  JSON.stringify({ username, messages: messages.reverse() })
+                );
+              }
+            );
+          } else {
+            socket.emit("join", JSON.stringify({ username, messages: [] }));
+          }
+        });
       }
     }
+// Basic Messages, expects format:
+    // { username, session_token, to, message }
+    // Emits (to both sender and receiver):
+    // { username, to, message }
+    socket.on("message", (clientMessage) => {
+      // Parse message
+      let parsedMessage = null;
+      try {
+        parsedMessage = JSON.parse(clientMessage);
+      } catch (error) {
+        return;
+      }
+      const { username, session_token, to, message } = parsedMessage;
+      if (!username || !session_token || !to || !message) {
+        return;
+      }
+      if (!verifyUserAndSession({ username, session_token })) {
+        return;
+      }
+      if (!user_memory.has(to)) {
+        return;
+      }
+      delete parsedMessage.session_token;
+      console.log(
+        `Client ${socket.id} sent message to ${to}:`,
+        JSON.stringify(parsedMessage, null, 2)
+      );
+      const to_socket_id = user_memory.get(to).socket_id;
+      const outgoingMessage = JSON.stringify({
+        sender: username,
+        reciever: to,
+        message,
+      });
+      socket.emit("message", outgoingMessage);
+      io.to(to_socket_id).emit("message", outgoingMessage);
+      const tablename = msgTableName(username, to);
+      console.log("Logging message to table:", tablename);
+      tableExists(tablename, (err, exists) => {
+        if (err) {
+          return;
+        }
+        if (!exists) {
+          // each msg table has an id autoincrementing primary key and a message column, a sender column, and a timestamp column
+          db.run(
+            `CREATE TABLE ${tablename} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, sender TEXT, timestamp TEXT)`,
+            (err) => {
+              db.run(
+                `INSERT INTO ${tablename} (message, sender, timestamp) VALUES (?, ?, ?)`,
+                [message, username, new Date().toISOString()],
+                (err) => {
+                  if (err) {
+                    console.error("Error inserting message:", err.message);
+                  }
+                }
+              );
+            }
+          );
+        } else {
+          db.run(
+            `INSERT INTO ${tablename} (message, sender, timestamp) VALUES (?, ?, ?)`,
+            [message, username, new Date().toISOString()],
+            (err) => {
+              if (err) {
+                console.error("Error inserting message:", err.message);
+              }
+            }
+          );
+        }
+      });
+    });
 
+    // File Transfer handling
+    const fileChunks = {};
+    socket.on("fileChunk", (clientMessage) => {
+      let parsedMessage = null;
+      try {
+        parsedMessage = JSON.parse(clientMessage);
+      } catch (error) {
+        return;
+      }
+      const {
+        username,
+        session_token,
+        type,
+        fileName,
+        mimeType,
+        chunkIndex,
+        data,
+      } = parsedMessage;
+      if (!username || !session_token || !type || !fileName || !mimeType) {
+        return;
+      }
+      if (!verifyUserAndSession({ username, session_token })) {
+        return;
+      }
+      if (!fileChunks[fileName]) {
+        fileChunks[fileName] = {
+          mimeType,
+          chunks: [],
+        };
+      }
+
+      fileChunks[fileName].chunks[chunkIndex] = new Uint8Array(data);
+    });
+    socket.on("fileEnd", (clientMessage) => {
+      let parsedMessage = null;
+      try {
+        parsedMessage = JSON.parse(clientMessage);
+      } catch (error) {
+        return;
+      }
+      const { username, session_token, to, fileName, totalChunks, mimeType } =
+        parsedMessage;
+      if (
+        !username ||
+        !session_token ||
+        !totalChunks ||
+        !fileName ||
+        !mimeType ||
+        !to
+      ) {
+        return;
+      }
+      if (!verifyUserAndSession({ username, session_token })) {
+        return;
+      }
+      if (
+        fileChunks[fileName].chunks.filter((chunk) => chunk).length ===
+        totalChunks
+      ) {
+        const combinedChunks = new Uint8Array(
+          fileChunks[fileName].chunks.reduce(
+            (acc, chunk) => acc + chunk.length,
+            0
+          )
+        );
+
+        let offset = 0;
+        fileChunks[fileName].chunks.forEach((chunk) => {
+          combinedChunks.set(chunk, offset);
+          offset += chunk.length;
+        });
+
+        const fullFileData = combinedChunks;
+
+        const outgoing = JSON.stringify({
+          sender: username,
+          reciever: to,
+          fileData: {
+            type: mimeType,
+            name: fileName,
+            data: Array.from(fullFileData),
+          },
+        });
+
+        socket.emit("file", outgoing);
+        io.to(user_memory.get(to).socket_id).emit("file", outgoing);
+      }
+      const tablename = msgTableName(username, to);
+      console.log("Logging message to table:", tablename);
+      tableExists(tablename, (err, exists) => {
+        if (err) {
+          return;
+        }
+        if (!exists) {
+          // each msg table has an id autoincrementing primary key and a message column, a sender column, and a timestamp column
+          db.run(
+            `CREATE TABLE ${tablename} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, sender TEXT, timestamp TEXT)`,
+            (err) => {
+              db.run(
+                `INSERT INTO ${tablename} (message, sender, timestamp) VALUES (?, ?, ?)`,
+                [
+                  `*Sent a file: ${fileName}*`,
+                  username,
+                  new Date().toISOString(),
+                ],
+                (err) => {
+                  if (err) {
+                    console.error("Error inserting message:", err.message);
+                  }
+                }
+              );
+            }
+          );
+        } else {
+          db.run(
+            `INSERT INTO ${tablename} (message, sender, timestamp) VALUES (?, ?, ?)`,
+            [`*Sent a file: ${fileName}*`, username, new Date().toISOString()],
+            (err) => {
+              if (err) {
+                console.error("Error inserting message:", err.message);
+              }
+            }
+          );
+        }
+      });
+    });
     // Handle disconnects
     socket.on("disconnect", () => {
       // Tell all clients that a user has left
       clearInterval(heartbeatInterval);
       for (const [username, user] of user_memory) {
         if (username !== verificationinfo.username) {
-          io.to(user.socket_id).emit("leave", JSON.stringify({ username: verificationinfo.username }));
+          io.to(user.socket_id).emit(
+            "leave",
+            JSON.stringify({ username: verificationinfo.username })
+          );
         }
       }
       if (user_memory.has(verificationinfo.username)) {
@@ -375,7 +653,6 @@ io.on("connection", (socket) => {
         ...user_memory.keys(),
       ]);
     });
-
   });
 });
 
