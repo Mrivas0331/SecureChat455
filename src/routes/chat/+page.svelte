@@ -120,7 +120,7 @@
         window.location.href = "/";
       } else {
         alert(
-          "You have been disconnected from the server for an unknown reason"
+          "You have been disconnected from the server for an unknown reason",
         );
         window.location.href = "/login";
       }
@@ -132,7 +132,16 @@
       console.log("Connected to server");
       socket.emit(
         "verify",
-        JSON.stringify({ username, session_token: session })
+        JSON.stringify({ username, session_token: session }),
+      );
+    });
+
+    // Respond to server heartbeats
+    socket.on("heartbeat", () => {
+      console.log("Received heartbeat request from server, sending response");
+      socket.emit(
+        "heartbeat",
+        JSON.stringify({ username, session_token: session }),
       );
     });
 

@@ -301,7 +301,81 @@ io.on("connection", (socket) => {
     }
 
     // Client passed socket verification, store their info and attach new events
-    //need to do still
+
+    user_memory.set(verificationinfo.username, {
+      socket_id: socket.id,
+      session_token: verificationinfo.session_token,
+    });
+    console.log(`Client ${socket.id} passed verification. All online users:`, [
+      ...user_memory.keys(),
+    ]);
+
+
+    // All socket messages are in the expected format of:
+    // { username, session_token, event, ...other_info_related_to_event }
+    // event tells us what to do with the other_info, such as "message" or "join"
+
+    // Heartbeat code
+    let heartbeatRecieved = true;
+    const interval = 30 * 1000 ; // 30 seconds per heartbeat
+    const sendHeartbeat = () => {
+      if (!heartbeatRecieved) {
+        console.log(`Client ${socket.id} failed to respond to heartbeat.`);
+        socket.disconnect(true);
+        clearInterval(heartbeatInterval);
+        return;
+      }
+      heartbeatRecieved = false;
+      socket.emit("heartbeat");
+    };
+    socket.on("heartbeat", async (verificationInfo) => {
+      heartbeatRecieved = true;
+      try {
+        const verification = JSON.parse(verificationInfo);
+        if (!verifyUserAndSession(verification)) {
+          throw new Error("Invalid verification.");
+        }
+      } catch (error) {
+        console.log(`Client ${socket.id} failed heartbeat verification.`);
+        socket.disconnect(true);
+      }
+    });
+    let heartbeatInterval = null;
+    new Promise((resolve) => setTimeout(resolve, 2000)).then(() => {
+      heartbeatInterval = setInterval(sendHeartbeat, interval);
+    });
+
+    // Tell all clients that a new user has joined
+    for (const [username, user] of user_memory) {
+      if (username !== verificationinfo.username) {
+        io.to(user.socket_id).emit("join", JSON.stringify({ username: verificationinfo.username, messages: [] }));
+      }
+    }
+
+    // Tell this user all the other online users
+    for (const [username, user] of user_memory) {
+      if (username !== verificationinfo.username) {
+        socket.emit("join", JSON.stringify({ username, messages: [] }));
+      }
+    }
+
+    // Handle disconnects
+    socket.on("disconnect", () => {
+      // Tell all clients that a user has left
+      clearInterval(heartbeatInterval);
+      for (const [username, user] of user_memory) {
+        if (username !== verificationinfo.username) {
+          io.to(user.socket_id).emit("leave", JSON.stringify({ username: verificationinfo.username }));
+        }
+      }
+      if (user_memory.has(verificationinfo.username)) {
+        user_memory.delete(verificationinfo.username);
+      }
+      console.log(`Client ${socket.id} disconnected. All online users:`, [
+        ...user_memory.keys(),
+      ]);
+    });
+
   });
 });
 
