@@ -267,7 +267,7 @@
     // Handle incoming files
     socket.on("file", (dat) => {
       const data = JSON.parse(dat);
-      const { sender, sender, fileData } = data;
+      const { sender, reciever, fileData } = data;
       recvFile(sender, reciever, fileData);
     });
 </script>
