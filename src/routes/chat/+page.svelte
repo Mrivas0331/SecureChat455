@@ -209,12 +209,66 @@
         })
       );
     };
+  // Define Send File function
+  send_file = () => {
+      if (!chatting_with) return;
+      if (!fileInputElement?.files || !fileInputElement.files[0]) return;
+      const file = fileInputElement.files[0];
 
+      const chunkSize = 1024 * 64;
+      const reader = new FileReader();
+
+      reader.onload = async (event) => {
+        const arrayBuffer = event.target.result;
+        const binaryData = new Uint8Array(arrayBuffer);
+        const totalChunks = Math.ceil(binaryData.length / chunkSize);
+
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          const start = chunkIndex * chunkSize;
+          const end = Math.min(start + chunkSize, binaryData.length);
+          const chunk = binaryData.slice(start, end);
+
+          const chunk_message = {
+            type: "fileChunk",
+            fileName: file.name,
+            mimeType: file.type,
+            chunkIndex: chunkIndex,
+            totalChunks: totalChunks,
+            data: Array.from(chunk),
+            username: username,
+            session_token: session,
+          };
+
+          socket.emit("fileChunk", JSON.stringify(chunk_message));
+        }
+
+        socket.emit(
+          "fileEnd",
+          JSON.stringify({
+            username,
+            to: chatting_with,
+            session_token: session,
+            totalChunks,
+            fileName: file.name,
+            mimeType: file.type,
+          })
+        );
+        fileInputElement.value = "";
+      };
+
+      reader.readAsArrayBuffer(file);
+    };
     // Handle incoming messages
     socket.on("message", (dat) => {
       const data = JSON.parse(dat);
       const { sender, reciever, message } = data;
       recvMessage(sender, reciever, message);
+    });
+    // Handle incoming files
+    socket.on("file", (dat) => {
+      const data = JSON.parse(dat);
+      const { sender, sender, fileData } = data;
+      recvFile(sender, reciever, fileData);
     });
 </script>
 
