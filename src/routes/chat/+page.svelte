@@ -145,17 +145,22 @@
       );
     });
 
-    console.log("Added max");
-    userOnline("max", []);
-    console.log("Added mark");
-    userOnline("mark", []);
-    console.log("Added elzie");
-    userOnline("elzie", []);
-    // push 4 messages to hannah
-    recvMessage("max", username, "Hello");
-    recvMessage(username, "max", "How are you?");
-    recvMessage("max", username, "I'm good");
-    recvMessage(username, "max", "ok");
+        // Add user to chat list when they join
+        socket.on("join", (dat) => {
+      const data = JSON.parse(dat);
+      const { username, messages } = data;
+      // if user already in chats for some reason remove them first
+      userOffline(username);
+      userOnline(username, messages);
+    });
+
+    // Remove user from chat list when they leave
+    socket.on("leave", (dat) => {
+      const data = JSON.parse(dat);
+      const { username } = data;
+      console.log("User left: " + username);
+      userOffline(username);
+    });
   });
 </script>
 
