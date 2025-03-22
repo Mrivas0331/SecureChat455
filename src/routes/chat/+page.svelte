@@ -146,7 +146,7 @@
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 3000,
-      transports: ["websocket"],
+      //transports: ["websocket"],
     });
 
     // Handle disconnects
