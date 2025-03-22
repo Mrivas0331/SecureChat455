@@ -28,8 +28,8 @@
       }
     } else if (flashmsg === " error missing") {
       alert("Error: Missing username or password");
-    } else if (flashmsg === " error forbidden") {
-      alert('Error: Can\'t use the character "_" in username or password');
+    } else if (flashmsg === " error username") {
+      alert("Error: Your username can only contain letters and numbers");
     } else if (flashmsg === " error exists") {
       alert("Error: Username already exists");
     } else if (flashmsg === " error server") {
