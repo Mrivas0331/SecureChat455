@@ -31,5 +31,5 @@ __pycache__/
 *.sqlitedb
 *.log
 *.cache
-
+chats/
 venv/

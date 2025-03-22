@@ -271,6 +271,9 @@ function verifyUserAndSession(socket_message) {
         if (!row) {
           return false;
         }
+        if (row.session_token !== session_token) {
+          return false;
+        }
         return true;
       }
     );
