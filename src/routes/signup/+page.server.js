@@ -23,8 +23,9 @@ export const actions = {
       return JSON.stringify({});
     }
     
-    if (password.include("_") || username.include("_")) {
-      cookies.set("flash", "signup | error forbidden", { path: "/" });
+    // Ensure usernames contain no spaces, or special characters. Just caps/lowercase/numbers
+    if (!/^[a-zA-Z0-9]*$/.test(username)) {
+      cookies.set("flash", "signup | error username", { path: "/" });
       return JSON.stringify({});
     }
 
