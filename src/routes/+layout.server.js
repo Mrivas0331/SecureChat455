@@ -4,7 +4,7 @@ export const load = async (event) => {
 
   // Uncomment these for dev variables
   process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
-  socket_url = "https://localhost:5433/";
+  //socket_url = "https://localhost:5433/";
 
   if (!cookies.get("ws_url") || cookies.get("ws_url") !== socket_url) {
     cookies.set("ws_url", socket_url, { path: "/" });
