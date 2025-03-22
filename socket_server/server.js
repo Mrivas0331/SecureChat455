@@ -286,7 +286,12 @@ function verifyUserAndSession(socket_message) {
 // Socket.IO Events
 // user_memory stores { username: { socket_id, session_token } }
 const user_memory = new Map();
+const message_limit = 5;
+  const timeframe = 10000
+  const messagerate = new Map();
 io.on("connection", (socket) => {
+  const ip = socket.handshake.address;
+  
   // All socket messages are in the expected format of:
   // { username, sesson_token, event, ...other_info_related_to_event }
   console.log("\nClient connected:", socket.id);
@@ -438,11 +443,22 @@ io.on("connection", (socket) => {
         });
       }
     }
-// Basic Messages, expects format:
+    // Basic Messages, expects format:
     // { username, session_token, to, message }
     // Emits (to both sender and receiver):
     // { username, to, message }
     socket.on("message", (clientMessage) => {
+      const now = Date.now();
+      const userID = data.userID || ip;
+      if (!messagerate.has(userID)) {
+        messagerate.set(userID, []);
+      }
+      let timestamps = messagerate.get(userID).filter((time) => now - time < timeframe);
+      if (timestamps.length > message_limit) {
+        socket.emit("rate_limited", { error: "Sending messages too quickly"});
+        console.log(`${userID} has been rate limited`)
+        return;
+      }
       // Parse message
       let parsedMessage = null;
       try {
