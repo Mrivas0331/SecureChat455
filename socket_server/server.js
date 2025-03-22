@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const sqlite3 = require("sqlite3").verbose();
 const crypto = require("crypto");
 const fs = require("fs");
+const { exec } = require("child_process");
 const env = JSON.parse(fs.readFileSync("env.json", "utf8"));
 
 // Server Setup
@@ -49,17 +50,14 @@ function tableExists(tableName, callback) {
   );
 }
 function msgTableName(user1, user2) {
+  console.log(
+    crypto.createHash("sha256").update(user1.toLowerCase()).digest("hex")
+  );
   const fn = user1 > user2 ? user1 : user2;
   const sn = user1 === fn ? user2 : user1;
   return `${fn}_${sn}`;
 }
-// Create initial database tables
-db.run(`
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    message TEXT
-  )
-`);
+// Create user table
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -479,7 +477,6 @@ io.on("connection", (socket) => {
           return;
         }
         if (!exists) {
-          // each msg table has an id autoincrementing primary key and a message column, a sender column, and a timestamp column
           db.run(
             `CREATE TABLE ${tablename} (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT, sender TEXT, timestamp TEXT)`,
             (err) => {
@@ -655,7 +652,17 @@ io.on("connection", (socket) => {
     });
   });
 });
-
+// Every 10 minutes, dump all chats to text files
+setInterval(() => {
+  exec("node dump_chats_as_txts.js", (err, stdout, stderr) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+    console.log("\nOutput from periodic chat dump:");
+    console.log(stdout);
+  });
+}, 10 * 60 * 1000);
 // Start the server
 const port = env.port;
 const host = env.host;
