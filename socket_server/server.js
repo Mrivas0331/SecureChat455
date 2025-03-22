@@ -287,10 +287,9 @@ function verifyUserAndSession(socket_message) {
 // user_memory stores { username: { socket_id, session_token } }
 const user_memory = new Map();
 const message_limit = 5;
-  const timeframe = 10000
-  const messagerate = new Map();
+const timeframe = 10000;
+const messagerate = new Map();
 io.on("connection", (socket) => {
-  const ip = socket.handshake.address;
   
   // All socket messages are in the expected format of:
   // { username, sesson_token, event, ...other_info_related_to_event }
@@ -448,17 +447,6 @@ io.on("connection", (socket) => {
     // Emits (to both sender and receiver):
     // { username, to, message }
     socket.on("message", (clientMessage) => {
-      const now = Date.now();
-      const userID = data.userID || ip;
-      if (!messagerate.has(userID)) {
-        messagerate.set(userID, []);
-      }
-      let timestamps = messagerate.get(userID).filter((time) => now - time < timeframe);
-      if (timestamps.length > message_limit) {
-        socket.emit("rate_limited", { error: "Sending messages too quickly"});
-        console.log(`${userID} has been rate limited`)
-        return;
-      }
       // Parse message
       let parsedMessage = null;
       try {
@@ -475,6 +463,21 @@ io.on("connection", (socket) => {
       }
       if (!user_memory.has(to)) {
         return;
+      }
+      // Rate limiting
+      const now = Date.now();
+      if (!messagerate.has(username)) {
+        messagerate.set(username, []);
+      }
+      messagerate.get(username).push(now);
+      if (messagerate.get(username).length > message_limit) {
+        const timespan = now - messagerate.get(username)[0];
+        if (timespan < timeframe) {
+          socket.emit("message_rate_limit", "");
+          messagerate.get(username).shift();
+          return;
+        }
+        messagerate.get(username).shift();
       }
       delete parsedMessage.session_token;
       console.log(

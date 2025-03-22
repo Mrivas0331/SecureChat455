@@ -165,7 +165,9 @@
         window.location.href = "/login";
       }
     });
-
+    socket.on("message_rate_limit", (_) => {
+      alert("You are sending messages too quickly, please slow down");
+    });
     // Verify on connection start
     socket.on("connect", async () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
