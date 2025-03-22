@@ -1,9 +1,9 @@
 # SecureChat
 
-Project that functions as a chat app using Socket.io and WSS/https for real time communication\
+Project that functions as a chat app using Socket.io and WSS/https for real time communication
 
-Funtionality includes real time chat messages between two or more users, all of which have their own user login and password
-courtesy of Firebase.
+Funtionality includes real time chat messages between two or more users in a private messanger environment, all of which have their own user login and password
+courtesy of SQLite.
 
 Other functions include:
 
@@ -11,6 +11,8 @@ Other functions include:
 - Consistent 5 second heartbeat pings from server -> client
 - Message limiting in the case of spam
 - User connection and disconnections messages using their chosen username
+- Brute force countermeasures (rate limiting)
+- More user text features and emoji support
 
 Developed by [Demi Chen](https://github.com/demihungry) and [Max Rivas](https://github.com/Mrivas0331), using SvelteKit, HTML, CSS, and JavaScript.
 
