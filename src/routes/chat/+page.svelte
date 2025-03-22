@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import { io } from "socket.io-client";
   import { marked } from "marked";
+  import { createPicker } from "picmo";
 
   function mdToHtml(md) {
     return marked(md);
@@ -14,6 +15,7 @@
 
   let msgInputField = "";
   let fileInputElement = null;
+
   function verifyFlash() {
     // Check for flash cookie
     const flash = page.data.cookies.flash;
@@ -40,6 +42,7 @@
   let chats = [];
 
   let chatting_with = "";
+
   // Handles sending messages and files
   let send_message = () => {
     alert("wait for connection");
@@ -47,6 +50,7 @@
   let send_file = () => {
     alert("wait for connection");
   };
+
   // Run when a user goes online, adds a Chat object to the chats array
   function userOnline(user, old_messages) {
     chats.push({
@@ -131,6 +135,12 @@
   onMount(() => {
     verifyFlash();
 
+    const pickerRoot = document.querySelector("#pickerContainer");
+    const picker = createPicker({ rootElement: pickerRoot });
+    picker.addEventListener("emoji:select", (event) => {
+      msgInputField += event.emoji;
+    });
+
     // Connect to socket server
     const socket = io(socket_url, {
       reconnection: true,
@@ -175,8 +185,8 @@
       );
     });
 
-        // Add user to chat list when they join
-        socket.on("join", (dat) => {
+    // Add user to chat list when they join
+    socket.on("join", (dat) => {
       const data = JSON.parse(dat);
       const { username, messages } = data;
       // if user already in chats for some reason remove them first
@@ -191,10 +201,9 @@
       console.log("User left: " + username);
       userOffline(username);
     });
-  });
 
-  // Define Send Message function
-  send_message = () => {
+    // Define Send Message function
+    send_message = () => {
       if (!chatting_with) return;
       if (!msgInputField) return;
       const message = msgInputField;
@@ -209,8 +218,9 @@
         })
       );
     };
-  // Define Send File function
-  send_file = () => {
+
+    // Define Send File function
+    send_file = () => {
       if (!chatting_with) return;
       if (!fileInputElement?.files || !fileInputElement.files[0]) return;
       const file = fileInputElement.files[0];
@@ -258,18 +268,21 @@
 
       reader.readAsArrayBuffer(file);
     };
+
     // Handle incoming messages
     socket.on("message", (dat) => {
       const data = JSON.parse(dat);
       const { sender, reciever, message } = data;
       recvMessage(sender, reciever, message);
     });
+
     // Handle incoming files
     socket.on("file", (dat) => {
       const data = JSON.parse(dat);
       const { sender, reciever, fileData } = data;
       recvFile(sender, reciever, fileData);
     });
+  });
 </script>
 
 <title>SecureChat | Chat</title>
@@ -320,36 +333,37 @@
           <b>{message.sender}</b>:
         </div>
         <img src={message.imageUrl} alt={message.name} class="in-chat-image" />
-        {:else if message.isFile}
-          <div>
-            <b>{message.sender}</b>:
-            <a href={message.fileUrl} download={message.fileName}>
-              {message.fileName}
-            </a>
-          </div>
-        {:else if message.htmlContent}
-          <div class="row-msg">
-            <p>{message.sender}:</p>
-            {@html message.htmlContent}
-          </div>
-        {:else}
-          <div>
-            <b>{message.sender}:</b>
-            {message.content}
-          </div>
-        {/if}
-      {/each}
-    </div>
-    <br />
-  {/if}
-  <div
-    class={chatting_with !== "" &&
-    chats.find(
-      (chat) => chat.user1 === chatting_with || chat.user2 === chatting_with
-    )
-      ? ""
-      : "invisible"}
-  >
+      {:else if message.isFile}
+        <div>
+          <b>{message.sender}</b>:
+          <a href={message.fileUrl} download={message.fileName}>
+            {message.fileName}
+          </a>
+        </div>
+      {:else if message.htmlContent}
+        <div class="row-msg">
+          <p>{message.sender}:</p>
+          {@html message.htmlContent}
+        </div>
+      {:else}
+        <div>
+          <b>{message.sender}:</b>
+          {message.content}
+        </div>
+      {/if}
+    {/each}
+  </div>
+  <br />
+{/if}
+<div
+  class={(chatting_with !== "" &&
+  chats.find(
+    (chat) => chat.user1 === chatting_with || chat.user2 === chatting_with
+  )
+    ? ""
+    : "invisible") + " sep_input_fields"}
+>
+  <div>
     <input
       type="text"
       bind:value={msgInputField}
@@ -361,8 +375,18 @@
     <input type="file" bind:this={fileInputElement} />
     <button onclick={send_file}>Send File</button>
   </div>
+  <div class="picker_spacer"><div id="pickerContainer"></div></div>
+</div>
 
 <style>
+  .sep_input_fields {
+    display: flex;
+    flex-direction: row;
+  }
+  .picker_spacer {
+    margin-left: 1rem;
+    margin-bottom: 5rem;
+  }
   .invisible {
     opacity: 0;
   }
