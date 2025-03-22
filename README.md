@@ -22,6 +22,10 @@ Before developing, always run `npm install` to ensure you have all the packages 
 
 If you want to edit any of the frontend code, you can do `npm install` then `npm run dev -- --open`. This opens a development environment in your browser where any code you edit changes in real time. This is **just** to run the frontend and edit it as necessary.
 
+**Note**: You may need to visit [this IP](https://45.49.193.179:49153/) and trust the certificate.
+
+To checkout the website, visit [chat.csufcsproject.com](https://chat.csufcsproject.com)
+
 If you need the server to run locally while developing the frontend, or you want to change server functionality, create a copy of `socket_server/env.example.json` as `socket_server/env.json`. Change the variables there to what you need. For development, this is what I recommend:
 
 ```json
