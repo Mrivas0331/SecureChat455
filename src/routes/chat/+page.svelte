@@ -6,6 +6,10 @@
   import { createPicker } from "picmo";
 
   function mdToHtml(md) {
+    if (typeof md !== "string") {
+      console.warn("mdToHTML() got a non string", md);
+      return "[Invalid Message]";
+    }
     return marked(md);
   }
 
@@ -169,7 +173,7 @@
       chat.messages.push({
         sender,
         content: message,
-        htmlContent: mdToHtml(message),
+        htmlContent: mdToHtml(plaintext),
       });
     }
       chats = [...chats];
