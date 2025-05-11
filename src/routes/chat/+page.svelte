@@ -42,7 +42,7 @@
       alert("Internal Server Error");
     }
   }
-
+  //await generateAndSendECDHKey();
   let chats = [];
 
   let chatting_with = "";
@@ -157,8 +157,10 @@
     } else if (message.iv && message.ciphertext) {
       
       try {
-        const sharedSec = prompt(`Enter shared secret from ${sender}`);
-        const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+        //const sharedSec = prompt(`Enter shared secret from ${sender}`);
+        //const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+        const key = sharedKeys[sender];
+        if (!key) throw new Error("Missing shared key");
         const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
         chat.messages.push({
         sender,
@@ -166,7 +168,7 @@
         htmlContent: mdToHtml(plaintext),
       });
       } catch (e) {
-        chat.message.push({
+        chat.messages.push({
           sender,
           content: "[Unable to decrypt message]",
         });
@@ -222,7 +224,7 @@
 
   onMount(() => {
     verifyFlash();
-
+    generateAndSendECDHKey();
     const pickerRoot = document.querySelector("#pickerContainer");
     const picker = createPicker({ rootElement: pickerRoot });
     picker.addEventListener("emoji:select", (event) => {
@@ -273,7 +275,25 @@
         JSON.stringify({ username, session_token: session })
       );
     });
+    let localECDHKeyPair = null;
+    const publicKeys = {};
+    const sharedKeys = {};
 
+    // Call after verification completes
+    async function generateAndSendECDHKey() {
+      localECDHKeyPair = await crypto.subtle.generateKey(
+        { name: "ECDH", namedCurve: "P-256" },
+        true,
+        ["deriveKey"]
+      );
+
+    const publicKeyJWK = await crypto.subtle.exportKey("jwk", localECDHKeyPair.publicKey);
+    socket.emit("public_key", JSON.stringify({
+      username,
+      session_token: session,
+      publicKey: publicKeyJWK,
+    }));
+}
     // Add user to chat list when they join
     socket.on("join", (dat) => {
       const data = JSON.parse(dat);
@@ -290,6 +310,36 @@
       console.log("User left: " + username);
       userOffline(username);
     });
+    socket.on("public_key", async (data) => {
+      const { username: peer, publicKey } = JSON.parse(data);
+      if (peer === username) return;
+
+      const importedPeerKey = await crypto.subtle.importKey(
+        "jwk",
+        publicKey,
+        { name: "ECDH", namedCurve: "P-256" },
+        false,
+        []
+      );
+
+      publicKeys[peer] = importedPeerKey;
+
+      sharedKeys[peer] = await crypto.subtle.deriveKey(
+        {
+          name: "ECDH",
+          public: importedPeerKey,
+        },
+        localECDHKeyPair.privateKey,
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        false,
+        ["encrypt", "decrypt"]
+      );
+
+      console.log(`Derived shared key with ${peer}`);
+  });
 
     // Define Send Message function
     send_message = async () => {
@@ -297,8 +347,13 @@
       if (!msgInputField) return;
       const message = msgInputField;
       msgInputField = "";
-      const sharedSec = prompt("Enter shared secret");
-      const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
+      //const sharedSec = prompt("Enter shared secret");
+      //const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
+      const key = sharedKeys[chatting_with];
+      if (!key) {
+        console.warn("No shared key with this user");
+        return;
+      }
       const {iv, ciphertext} = await encryptMessage(message, key);
       console.log("Sending encrypted message:", ciphertext);
       socket.emit(
