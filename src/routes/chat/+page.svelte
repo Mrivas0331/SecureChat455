@@ -147,6 +147,10 @@
   // Run when a user sends a message, adds the message to the appropriate Chat object
   async function recvMessage(sender, reciever, message, encrypted) {
     console.log("received message: ", message);
+    console.log("Encrypted: ", encrypted);
+    console.log("Cipher: ", message.ciphertext);
+    console.log("IV: ", message.iv);
+    alert("Check if works");
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
