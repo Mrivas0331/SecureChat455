@@ -156,8 +156,8 @@
     } else if (encrypted && iv) {
       const sharedSec = prompt(`Enter shared secret from ${sender}`);
       const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+      const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
       try {
-        const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
         chat.messages.push({
         sender,
         content: plaintext,
