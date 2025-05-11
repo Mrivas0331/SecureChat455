@@ -454,7 +454,7 @@ io.on("connection", (socket) => {
       } catch (error) {
         return;
       }
-      const { username, session_token, to, message } = parsedMessage;
+      const { username, session_token, to, message, encrypted } = parsedMessage;
       if (!username || !session_token || !to || !message) {
         return;
       }
