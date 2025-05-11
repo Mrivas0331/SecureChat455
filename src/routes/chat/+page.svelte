@@ -298,7 +298,7 @@
         JSON.stringify({
           username,
           to: chatting_with,
-          ciphertext,
+          message: ciphertext,
           session_token: session,
           encrypted: true,
           iv,
