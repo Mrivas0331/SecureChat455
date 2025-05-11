@@ -292,13 +292,13 @@
       const sharedSec = prompt("Enter shared secret");
       const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
       const {iv, ciphertext} = await encryptMessage(message, key);
-      console.log("Sending encrypted message:", encryptedMessage);
+      console.log("Sending encrypted message:", ciphertext);
       socket.emit(
         "message",
         JSON.stringify({
           username,
           to: chatting_with,
-          message,
+          ciphertext,
           session_token: session,
           encrypted: true,
           iv,
