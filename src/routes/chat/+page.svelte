@@ -153,11 +153,12 @@
     );
     if (chat === undefined) {
       return;
-    } else if (encrypted && iv) {
-      const sharedSec = prompt(`Enter shared secret from ${sender}`);
-      const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
-      const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
+    } else if (encrypted && iv && message.ciphertext) {
+      
       try {
+        const sharedSec = prompt(`Enter shared secret from ${sender}`);
+        const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+        const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
         chat.messages.push({
         sender,
         content: plaintext,
@@ -169,11 +170,17 @@
           content: "[Unable to decrypt message]",
         });
       }
-    } else {
+    } else if (typeof message === "string") {
       chat.messages.push({
         sender,
         content: message,
         htmlContent: mdToHtml(message),
+      });
+    } else {
+      chat.messages.push({
+        sender, 
+        content: "[Invalid message format]",
+        htmlContent: mdToHtml("[Invalid message format]"),
       });
     }
       chats = [...chats];
