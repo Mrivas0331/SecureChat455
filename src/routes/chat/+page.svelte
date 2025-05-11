@@ -88,7 +88,7 @@
     if (chatting_with === user) chatting_with = "";
     chats = [...chats];
   }
-  async function key(password, salt) {
+  async function deriveKey(password, salt) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
