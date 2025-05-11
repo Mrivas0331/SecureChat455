@@ -141,7 +141,7 @@
   }
 
   // Run when a user sends a message, adds the message to the appropriate Chat object
-  async function recvMessage(sender, reciever, message) {
+  async function recvMessage(sender, reciever, message, iv = null, encrypted = false) {
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
@@ -149,19 +149,15 @@
     );
     if (chat === undefined) {
       return;
-    } else if (message.encrypted) {
+    } else if (encrypted && iv) {
       const sharedSec = prompt(`Enter shared secret from ${sender}`);
       const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
       try {
-        const plaintext = await decryptMessage(
-          message.ciphertext,
-          message.iv,
-          key
-        );
+        const plaintext = await decryptMessage(message, iv, key);
         chat.messages.push({
         sender,
-        content: message,
-        htmlContent: mdToHtml(message),
+        content: plaintext,
+        htmlContent: mdToHtml(plaintext),
       });
       } catch (e) {
         chat.message.push({
@@ -360,8 +356,8 @@
     // Handle incoming messages
     socket.on("message", (dat) => {
       const data = JSON.parse(dat);
-      const { sender, reciever, message } = data;
-      recvMessage(sender, reciever, message);
+      const { sender, reciever, message, iv, encrypted } = data;
+      recvMessage(sender, reciever, message, iv, encrypted);
     });
 
     // Handle incoming files

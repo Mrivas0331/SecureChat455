@@ -489,6 +489,8 @@ io.on("connection", (socket) => {
         sender: username,
         reciever: to,
         message,
+        iv: parsedMessage.iv ?? null,
+        encrypted: parsedMessage.encrypted ?? false,
       });
       socket.emit("message", outgoingMessage);
       io.to(to_socket_id).emit("message", outgoingMessage);
