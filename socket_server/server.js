@@ -537,7 +537,6 @@ io.on("connection", (socket) => {
         io.to(user_memory.get(from).socket_id).emit("receive_pubkey", { from: to, pubkey});
       }
     });
-    // File Transfer handling
     const fileChunks = {};
     socket.on("fileChunk", (clientMessage) => {
       let parsedMessage = null;
