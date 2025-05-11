@@ -143,13 +143,52 @@
     );
     return new TextDecoder().decode(decrypted);
   }
+  let ecdhKeyPairs;
+  let sharedKey = {}; //takes secret between users
+  async function generateECDHKeys() {
+    ecdhKeyPairs = await window.crypto.subtle.generateKey(
+      {
+        name: "ECDH",
+        namedC: "P-256",
+      },
+      true,
+      ["deriveKey", "deriveBits"]
+    );
+    const publicKeyJ = await window.crypto.subtle.exportKey("jwk", ecdhKeyPairs.publicKey);
+    socket.emit("ecdh_pubkey", { username, pubkey: publicKeyJ});
+  }
+  socket.on("receive_pubkey", async ({from, pubkey})=> {
+    const importedKey = await crypto.subtle.importKey(
+      "jwk",
+      pubkey,
+      { name: "ECDH", namedC: "P-256"},
+      false,
+      []
+    );
+    const derivedKey = await crypto.subtle.deriveKey(
+      {
+        name: "ECDH",
+        public: importedKey,
+      },
+      ecdhKeyPairs.privateKey,
+      {
+        name: "AES-GCM",
+        length: 256,
+      },
+      false,
+      ["encrypt", "decrypt"]
+    );
+    sharedSecrets[from] = derivedKey;
+  });
+  // Request another user's public key before sending message
+  function requestUserKey(toUsername) {
+    socket.emit("request_pubkey", { from: username, to: toUsername });
+  }
+
 
   // Run when a user sends a message, adds the message to the appropriate Chat object
   async function recvMessage(sender, reciever, message, encrypted) {
     console.log("received message: ", message);
-    console.log("Cipher: ", message.ciphertext);
-    console.log("IV: ", message.iv);
-    alert("Check if works");
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
@@ -160,8 +199,9 @@
     } else if (message.iv && message.ciphertext) {
       
       try {
-        const sharedSec = prompt(`Enter shared secret from ${sender}`);
-        const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+        //const sharedSec = prompt(`Enter shared secret from ${sender}`);
+        //const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+        const key = sharedSecrets[sender];
         const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
         chat.messages.push({
         sender,
@@ -299,9 +339,15 @@
       if (!chatting_with) return;
       if (!msgInputField) return;
       const message = msgInputField;
+      const key = sharedSecrets[chatting_with];
+      if (!sharedSecrets[chatting_with]) {
+        requestUserKey(chatting_with);
+        alert("Trying to swap keys");
+        return;
+      }
       msgInputField = "";
-      const sharedSec = prompt("Enter shared secret");
-      const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
+      //const sharedSec = prompt("Enter shared secret");
+      //const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
       const {iv, ciphertext} = await encryptMessage(message, key);
       console.log("Sending encrypted message:", ciphertext);
       socket.emit(

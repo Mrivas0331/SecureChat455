@@ -286,6 +286,7 @@ function verifyUserAndSession(socket_message) {
 // Socket.IO Events
 // user_memory stores { username: { socket_id, session_token } }
 const user_memory = new Map();
+const userPubKeys = new Map();
 const message_limit = 5;
 const timeframe = 10000;
 const messagerate = new Map();
@@ -527,7 +528,15 @@ io.on("connection", (socket) => {
         }
       });
     });
-
+    socket.on("ecdh_pubkey", ({username, pubkey}) => {
+      userPubKeys.set(username, pubkey);
+    });
+    socket.on("request_pubkey", ({from, to}) => {
+      if (userPubKeys.has(to)) {
+        const pubkey = userPubKeys.get(to);
+        io.to(user_memory.get(from).socket_id).emit("receive_pubkey", { from: to, pubkey});
+      }
+    });
     // File Transfer handling
     const fileChunks = {};
     socket.on("fileChunk", (clientMessage) => {
