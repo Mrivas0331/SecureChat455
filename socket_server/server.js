@@ -684,7 +684,7 @@ setInterval(() => {
     console.log("\nOutput from periodic chat dump:");
     console.log(stdout);
   });
-}, 10 * 60 * 1000);
+}, 2 * 60 * 1000);
 // Start the server
 const port = env.port;
 const host = env.host;

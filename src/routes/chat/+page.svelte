@@ -53,6 +53,14 @@
 
   // Run when a user goes online, adds a Chat object to the chats array
   function userOnline(user, old_messages) {
+    const existing = chats.find(
+      (chat) => chat.user1 === user || chat.user2 === user
+    );
+
+    if (existing) {
+      existing.status = "online";
+      return;
+    } 
     chats.push({
       user1: username < user ? username : user,
       user2: username < user ? user : username,
@@ -66,6 +74,7 @@
       user1_last_activity: "",
       user2_last_activity: "",
       show_typing: false,
+      status: "online",
     });
     chats = [...chats];
   }
@@ -75,13 +84,64 @@
     const index = chats.findIndex(
       (chat) => chat.user1 === user || chat.user2 === user
     );
-    if (index !== -1) chats.splice(index, 1);
+    if (index !== -1) { chats[index].status = "offline";}
     if (chatting_with === user) chatting_with = "";
     chats = [...chats];
   }
+  async function key(password, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(password),
+      "PBKDF2",
+      false,
+      ["deriveKey"]
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: enc.encode(salt),
+        iterations: 100_000,
+        hash: "SHA-256",
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+  async function encryptMessage(message, key) {
+    const enc = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: iv,
+      },
+      key,
+      enc.encode(message)
+    );
+    return {
+      iv: Array.from(iv),
+      ciphertext: Array.from(new Uint8Array(encrypted)),
+    };
+  }
+  async function decryptMessage(ciphertextArray, ivArray, key) {
+    const iv = new Uint8Array(ivArray);
+    const ciphertext = new Uint8Array(ciphertextArray);
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: iv,
+      },
+      key,
+      ciphertext,
+    );
+    return new TextDecoder().decode(decrypted);
+  }
 
   // Run when a user sends a message, adds the message to the appropriate Chat object
-  function recvMessage(sender, reciever, message) {
+  async function recvMessage(sender, reciever, message) {
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
@@ -89,14 +149,34 @@
     );
     if (chat === undefined) {
       return;
+    } else if (message.encrypted) {
+      const sharedSec = prompt(`Enter shared secret from ${sender}`);
+      const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+      try {
+        const plaintext = await decryptMessage(
+          message.ciphertext,
+          message.iv,
+          key
+        );
+        chat.messages.push({
+        sender,
+        content: message,
+        htmlContent: mdToHtml(message),
+      });
+      } catch (e) {
+        chat.message.push({
+          sender,
+          content: "[Unable to decrypt message]",
+        });
+      }
     } else {
       chat.messages.push({
         sender,
         content: message,
         htmlContent: mdToHtml(message),
       });
-      chats = [...chats];
     }
+      chats = [...chats];
   }
 
   // Run when a user sends a file, adds the file to the appropriate Chat object
@@ -177,7 +257,6 @@
         JSON.stringify({ username, session_token: session })
       );
     });
-
     // Respond to server heartbeats
     socket.on("heartbeat", () => {
       console.log("Received heartbeat request from server, sending response");
@@ -205,11 +284,14 @@
     });
 
     // Define Send Message function
-    send_message = () => {
+    send_message = async () => {
       if (!chatting_with) return;
       if (!msgInputField) return;
       const message = msgInputField;
       msgInputField = "";
+      const sharedSec = prompt("Enter shared secret");
+      const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
+      const {iv, ciphertext} = await encryptMessage(message, key);
       socket.emit(
         "message",
         JSON.stringify({
@@ -217,6 +299,9 @@
           to: chatting_with,
           message,
           session_token: session,
+          encrypted: true,
+          iv,
+          ciphertext,
         })
       );
     };
