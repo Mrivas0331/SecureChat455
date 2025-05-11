@@ -173,7 +173,7 @@
       chat.messages.push({
         sender,
         content: message,
-        htmlContent: mdToHtml(plaintext),
+        htmlContent: mdToHtml(message),
       });
     }
       chats = [...chats];
