@@ -147,7 +147,6 @@
   // Run when a user sends a message, adds the message to the appropriate Chat object
   async function recvMessage(sender, reciever, message, encrypted) {
     console.log("received message: ", message);
-    console.log("Encrypted: ", encrypted);
     console.log("Cipher: ", message.ciphertext);
     console.log("IV: ", message.iv);
     alert("Check if works");
@@ -158,7 +157,7 @@
     );
     if (chat === undefined) {
       return;
-    } else if (encrypted && message.iv && message.ciphertext) {
+    } else if (message.iv && message.ciphertext) {
       
       try {
         const sharedSec = prompt(`Enter shared secret from ${sender}`);
