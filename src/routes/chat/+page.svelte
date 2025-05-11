@@ -371,7 +371,7 @@
     socket.on("message", (dat) => {
       const data = JSON.parse(dat);
       const { sender, reciever, message, iv, encrypted } = data;
-      recvMessage(sender, reciever, message, iv, encrypted);
+      recvMessage(sender, reciever, message, encrypted);
     });
 
     // Handle incoming files
