@@ -153,7 +153,7 @@
       const sharedSec = prompt(`Enter shared secret from ${sender}`);
       const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
       try {
-        const plaintext = await decryptMessage(message, iv, key);
+        const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
         chat.messages.push({
         sender,
         content: plaintext,
@@ -294,11 +294,9 @@
         JSON.stringify({
           username,
           to: chatting_with,
-          message: ciphertext,
           session_token: session,
           encrypted: true,
-          iv,
-          ciphertext,
+          message: {ciphertext, iv},
         })
       );
     };
