@@ -147,54 +147,100 @@
   }
 
   // Run when a user sends a message, adds the message to the appropriate Chat object
-  async function recvMessage(sender, reciever, message, encrypted) {
-    console.log(`Message received from ${sender} to ${receiver} of received message: `, message);
-    console.log("Cipher: ", message.ciphertext);
+  async function recvMessage(sender, receiver, messageData, isMarkedEncrypted) {
+    console.log(`Message received from ${sender} to ${receiver}. Encrypted: ${isMarkedEncrypted}. Data: `, messageData);
+
     const chat = chats.find(
-      (chat) =>
-        (chat.user1 === sender && chat.user2 === reciever) ||
-        (chat.user1 === reciever && chat.user2 === sender)
+        (c) => // Renamed 'chat' to 'c' to avoid shadowing if 'chats' is module-level
+            (c.user1 === sender && c.user2 === receiver) ||
+            (c.user1 === receiver && c.user2 === sender)
     );
-    if (chat === undefined) {
-      return;
-    } else if (message.iv && message.ciphertext) {
-      
-      try {
-        //const sharedSec = prompt(`Enter shared secret from ${sender}`);
-        const canonicalKeyID = getCanonicalKeyID(sender, reciever);
-        let cryptokey = sessionDerivedKeys[canonicalKeyID];
-        if (!cryptokey) { console.log(`No key cached for ${canonicalKeyID}, enter one here`)
-          const sharedSec = prompt(`Enter shared secret you have with ${sender}`);
-        }
-        cryptokey = await deriveKey(sharedSec, canonicalKeyID);
-        sessionDerivedKeys[canonicalKeyID] = cryptokey;
-        const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
-        chat.messages.push({
-        sender,
-        content: plaintext,
-        htmlContent: mdToHtml(plaintext),
-      });
-      } catch (e) {
-        chat.message.push({
-          sender,
-          content: "[Unable to decrypt message]",
-        });
-      }
-    } else if (typeof message === "string") {
-      chat.messages.push({
-        sender,
-        content: message,
-        htmlContent: mdToHtml(message),
-      });
-    } else {
-      chat.messages.push({
-        sender, 
-        content: "[Invalid message format]",
-        htmlContent: mdToHtml("[Invalid message format]"),
-      });
+
+    if (!chat) {
+        console.warn(`Chat not found for sender: ${sender}, receiver: ${receiver}`);
+        return;
     }
-      chats = [...chats];
-  }
+
+    // Check if the message structure indicates it's encrypted AND it was flagged as such
+    if (isMarkedEncrypted && messageData && typeof messageData === 'object' && messageData.iv && messageData.ciphertext) {
+        const canonicalKeyID = getCanonicalKeyID(sender, receiver);
+        let cryptoKey = sessionDerivedKeys[canonicalKeyID]; // Use 'cryptoKey'
+
+        if (!cryptoKey) { // If key is not in cache
+            console.log(`No key cached for ${canonicalKeyID} (from ${sender}), prompting for secret.`);
+            const sharedSecretString = prompt(`Enter shared secret you have with ${sender}:`); // (B) 'sharedSecretString' defined here
+
+            if (!sharedSecretString) { // User cancelled
+                chat.messages.push({
+                    sender,
+                    content: "[Decryption skipped: No shared secret entered]",
+                    htmlContent: mdToHtml("[Decryption skipped: No shared secret entered]"),
+                });
+                chats = [...chats];
+                return;
+            }
+            // 'sharedSecretString' from (B) is used to derive 'cryptoKey' INSIDE this block
+            try {
+                cryptoKey = await deriveKey(sharedSecretString, canonicalKeyID);
+                sessionDerivedKeys[canonicalKeyID] = cryptoKey; // Cache the newly derived key
+                console.log(`Derived and cached new key for ${canonicalKeyID} from ${sender}`);
+            } catch (e) {
+                console.error("Error deriving key in recvMessage:", e);
+                chat.messages.push({
+                    sender,
+                    content: "[Error deriving decryption key. Check shared secret.]",
+                    htmlContent: mdToHtml("[Error deriving decryption key. Check shared secret.]"),
+                });
+                chats = [...chats];
+                return;
+            }
+        } else {
+            console.log(`Using cached key for ${canonicalKeyID} from ${sender}`);
+        }
+        // If cryptoKey is still not set (should be caught above, but as a safeguard)
+        if (!cryptoKey) {
+            alert("Decryption key is not available.");
+            // Add a message to the chat indicating this
+             chat.messages.push({
+                sender,
+                content: "[Decryption failed: Key unavailable]",
+                htmlContent: mdToHtml("[Decryption failed: Key unavailable]"),
+            });
+            chats = [...chats];
+            return;
+        }
+        try {
+            // USE 'cryptoKey', NOT 'key'
+            const plaintext = await decryptMessage(messageData.ciphertext, messageData.iv, cryptoKey);
+            chat.messages.push({
+                sender,
+                content: plaintext,
+                htmlContent: mdToHtml(plaintext),
+            });
+        } catch (e) {
+            console.error(`Decryption failed for message from ${sender}:`, e);
+            // TYPO: chat.messages.push not chat.message.push
+            chat.messages.push({
+                sender,
+                content: "[Unable to decrypt message. Shared secret may be incorrect.]",
+                htmlContent: mdToHtml("[Unable to decrypt message. Shared secret may be incorrect.]"),
+            });
+        }
+    } else if (typeof messageData === "string" && !isMarkedEncrypted) { // Plain text message
+        chat.messages.push({
+            sender,
+            content: messageData, // 'messageData' is the string here
+            htmlContent: mdToHtml(messageData),
+        });
+    } else {
+        chat.messages.push({
+            sender,
+            content: "[Invalid message format or unhandled encrypted structure]",
+            htmlContent: mdToHtml("[Invalid message format or unhandled encrypted structure]"),
+        });
+    }
+    chats = [...chats]; // To trigger Svelte reactivity
+}
 
   // Run when a user sends a file, adds the file to the appropriate Chat object
   function recvFile(sender, reciever, fileData) {
@@ -302,32 +348,64 @@
 
     // Define Send Message function
     send_message = async () => {
-      if (!chatting_with) return;
-      if (!msgInputField) return;
-      const message = msgInputField;
-      msgInputField = "";
-      const canonicalKeyID = getCanonicalKeyID(username, chatting_with);
-      let cryptokey = sessionDerivedKeys[canonicalKeyID];
-      if (!cryptokey) { console.log(`No cached key for ${canonicalKeyID}, enter one here`);
-        const sharedSec = prompt(`Enter shared secret for ${chatting_with}`);
-      }
-      //const sharedSec = prompt("Enter shared secret");
-      cryptokey = await deriveKey(sharedSec, canonicalKeyID);
-      sessionDerivedKeys[canonicalKeyID] = cryptokey;
-      console.log(`Derived and cached new key for ${canonicalKeyID}`);
-      const {iv, ciphertext} = await encryptMessage(message, cryptokey);
-      console.log("Sending encrypted message:", ciphertext);
-      socket.emit(
-        "message",
-        JSON.stringify({
-          username,
-          to: chatting_with,
-          session_token: session,
-          encrypted: true,
-          message: {ciphertext, iv},
-        })
-      );
-    };
+    if (!chatting_with) {
+        alert("Please select a user to chat with.");
+        return;
+    }
+    if (!msgInputField) {
+        alert("Message cannot be empty.");
+        return;
+    }
+    const messageContent = msgInputField; // Use a different name to avoid confusion
+    msgInputField = "";
+    const canonicalKeyID = getCanonicalKeyID(username, chatting_with);
+    let cryptoKey = sessionDerivedKeys[canonicalKeyID]; // Use consistent casing, e.g., cryptoKey
+    if (!cryptoKey) { // If key is NOT in cache
+        console.log(`No cached key for ${canonicalKeyID}, prompting for secret.`);
+        const sharedSecretString = prompt(`Enter shared secret for ${chatting_with}:`); // More descriptive name
+
+        if (!sharedSecretString) { // User cancelled or entered empty
+            alert("Shared secret is required to send an encrypted message.");
+            // Optionally restore input: msgInputField = messageContent;
+            return;
+        }
+        try {
+            // Derive the key AND cache it INSIDE this block
+            cryptoKey = await deriveKey(sharedSecretString, canonicalKeyID);
+            sessionDerivedKeys[canonicalKeyID] = cryptoKey;
+            console.log(`Derived and cached new key for ${canonicalKeyID}`);
+        } catch (e) {
+            console.error("Error deriving key in send_message:", e);
+            alert("Failed to derive encryption key. Please check the secret and try again.");
+            // Optionally restore input: msgInputField = messageContent;
+            return;
+        }
+    } else {
+        console.log(`Using cached key for ${canonicalKeyID}`);
+    }
+    // If cryptoKey is still not set (e.g., error in derivation or prompt cancelled and not returned properly)
+    if (!cryptoKey) {
+        alert("Encryption key is not available. Cannot send message.");
+        return;
+    }
+    try {
+        const { iv, ciphertext } = await encryptMessage(messageContent, cryptoKey);
+        console.log("Sending encrypted message for:", canonicalKeyID);
+        socket.emit(
+            "message",
+            JSON.stringify({
+                username,
+                to: chatting_with,
+                session_token: session,
+                encrypted: true,
+                message: { ciphertext, iv },
+            })
+        );
+    } catch (e) {
+        console.error("Error encrypting message:", e);
+        alert("An error occurred while encrypting the message.");
+    }
+};
 
     // Define Send File function
     send_file = () => {
