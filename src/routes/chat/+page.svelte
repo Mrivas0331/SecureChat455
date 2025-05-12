@@ -278,7 +278,37 @@
     let localECDHKeyPair = null;
     const publicKeys = {};
     const sharedKeys = {};
+    socket.on("public_key", async (data) => {
+      console.log("Received public key event: ", data);
+      const { username: peer, publicKey } = JSON.parse(data);
+      if (peer === username) return;
+      console.log(peer);
+      const importedPeerKey = await crypto.subtle.importKey(
+        "jwk",
+        publicKey,
+        { name: "ECDH", namedCurve: "P-256" },
+        false,
+        []
+      );
 
+      publicKeys[peer] = importedPeerKey;
+
+      sharedKeys[peer] = await crypto.subtle.deriveKey(
+        {
+          name: "ECDH",
+          public: importedPeerKey,
+        },
+        localECDHKeyPair.privateKey,
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        false,
+        ["encrypt", "decrypt"]
+      );
+
+      console.log(`Derived shared key with ${peer}`);
+  });
     // Call after verification completes
     async function generateAndSendECDHKey() {
       console.log("working here");
@@ -311,37 +341,7 @@
       console.log("User left: " + username);
       userOffline(username);
     });
-    socket.on("public_key", async (data) => {
-      console.log("Received public key event: ", data);
-      const { username: peer, publicKey } = JSON.parse(data);
-      if (peer === username) return;
-      console.log(peer);
-      const importedPeerKey = await crypto.subtle.importKey(
-        "jwk",
-        publicKey,
-        { name: "ECDH", namedCurve: "P-256" },
-        false,
-        []
-      );
-
-      publicKeys[peer] = importedPeerKey;
-
-      sharedKeys[peer] = await crypto.subtle.deriveKey(
-        {
-          name: "ECDH",
-          public: importedPeerKey,
-        },
-        localECDHKeyPair.privateKey,
-        {
-          name: "AES-GCM",
-          length: 256,
-        },
-        false,
-        ["encrypt", "decrypt"]
-      );
-
-      console.log(`Derived shared key with ${peer}`);
-  });
+    
 
     // Define Send Message function
     send_message = async () => {
