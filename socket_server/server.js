@@ -327,51 +327,11 @@ io.on("connection", (socket) => {
     user_memory.set(verificationinfo.username, {
       socket_id: socket.id,
       session_token: verificationinfo.session_token,
-      publicKey: null,
     });
     console.log(`Client ${socket.id} passed verification. All online users:`, [
       ...user_memory.keys(),
     ]);
-    socket.on("public_key", (data) => {
-      console.log(`Got this far`);
-    let parsed;
-    try {
-      parsed = JSON.parse(data);
-    } catch (e) {
-      return;
-    }
-      console.log(`Got to here for parsed: `, parsed);
-    const { username, session_token, publicKey } = parsed;
-    if (!verifyUserAndSession({ username, session_token })) return;
-    console.log("Got past !verify");
 
-    const selfUser = user_memory.get(username);
-    if (!selfUser) return;
-
-    selfUser.publicKey = publicKey;
-
-    // Send this user's public key to everyone else
-    for (const [otherUsername, otherUser] of user_memory) {
-      if (otherUsername !== username) {
-        console.log(`Sending public key of ${username} to ${otherUsername}`);
-        io.to(otherUser.socket_id).emit("public_key", JSON.stringify({
-          username,
-          publicKey,
-        }));
-      }
-    }
-
-    // Send existing users' public keys to this user
-    for (const [otherUsername, otherUser] of user_memory) {
-      if (otherUsername !== username && otherUser.publicKey) {
-        console.log(`Sending public key of ${username} to ${otherUsername}`);
-        io.to(socket.id).emit("public_key", JSON.stringify({
-          username: otherUsername,
-          publicKey: otherUser.publicKey,
-        }));
-      }
-    }
-  });
 
     // All socket messages are in the expected format of:
     // { username, session_token, event, ...other_info_related_to_event }
