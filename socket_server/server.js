@@ -351,6 +351,7 @@ io.on("connection", (socket) => {
     // Send this user's public key to everyone else
     for (const [otherUsername, otherUser] of user_memory) {
       if (otherUsername !== username) {
+        console.log(`Sending public key of ${username} to ${otherUsername}`);
         io.to(otherUser.socket_id).emit("public_key", JSON.stringify({
           username,
           publicKey,
@@ -361,6 +362,7 @@ io.on("connection", (socket) => {
     // Send existing users' public keys to this user
     for (const [otherUsername, otherUser] of user_memory) {
       if (otherUsername !== username && otherUser.publicKey) {
+        console.log(`Sending public key of ${username} to ${otherUsername}`);
         io.to(socket.id).emit("public_key", JSON.stringify({
           username: otherUsername,
           publicKey: otherUser.publicKey,

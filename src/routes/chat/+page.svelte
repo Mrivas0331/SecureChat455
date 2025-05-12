@@ -288,12 +288,12 @@
         ["deriveKey"]
       );
 
-    const publicKeyJWK = await crypto.subtle.exportKey("jwk", localECDHKeyPair.publicKey);
-    socket.emit("public_key", JSON.stringify({
-      username,
-      session_token: session,
-      publicKey: publicKeyJWK,
-    }));
+      const publicKeyJWK = await crypto.subtle.exportKey("jwk", localECDHKeyPair.publicKey);
+      socket.emit("public_key", JSON.stringify({
+        username,
+        session_token: session,
+        publicKey: publicKeyJWK,
+      }));
 }
     // Add user to chat list when they join
     socket.on("join", (dat) => {
@@ -312,7 +312,7 @@
       userOffline(username);
     });
     socket.on("public_key", async (data) => {
-      console.log(data);
+      console.log("Received public key event: ", data);
       const { username: peer, publicKey } = JSON.parse(data);
       if (peer === username) return;
       console.log(peer);
