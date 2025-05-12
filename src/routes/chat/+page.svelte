@@ -232,12 +232,12 @@
     });
 
     // Connect to socket server
-    const socket = io(socket_url, {
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 3000,
+    //const socket = io(socket_url, {
+      //reconnection: true,
+      //reconnectionAttempts: 5,
+      //reconnectionDelay: 3000,
       //transports: ["websocket"],
-    });
+    //});
 
     // Handle disconnects
     socket.on("disconnect", (reason) => {
@@ -259,14 +259,14 @@
       alert("You are sending messages too quickly, please slow down");
     });
     // Verify on connection start
-    socket.on("connect", async () => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      console.log("Connected to server");
-      socket.emit(
-        "verify",
-        JSON.stringify({ username, session_token: session })
-      );
-    });
+    //socket.on("connect", async () => {
+      //await new Promise((resolve) => setTimeout(resolve, 500));
+      //console.log("Connected to server");
+      //socket.emit(
+        //"verify",
+        //JSON.stringify({ username, session_token: session })
+      //);
+    //});
     // Respond to server heartbeats
     socket.on("heartbeat", () => {
       console.log("Received heartbeat request from server, sending response");
@@ -309,6 +309,20 @@
 
       console.log(`Derived shared key with ${peer}`);
   });
+  const socket = io(socket_url, {
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 3000,
+      //transports: ["websocket"],
+    });
+    socket.on("connect", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log("Connected to server");
+      socket.emit(
+        "verify",
+        JSON.stringify({ username, session_token: session })
+      );
+    });
     // Call after verification completes
     async function generateAndSendECDHKey() {
       console.log("working here");
