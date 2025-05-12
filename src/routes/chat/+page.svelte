@@ -294,6 +294,7 @@
         session_token: session,
         publicKey: publicKeyJWK,
       }));
+      console.log("Emitted public key");
 }
     // Add user to chat list when they join
     socket.on("join", (dat) => {
@@ -353,7 +354,7 @@
       //const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
       const key = sharedKeys[chatting_with];
       if (!key) {
-        console.warn("No shared key with this user");
+        console.warn(`No shared key with ${chatting_with}. Wait a moment...`);
         return;
       }
       const {iv, ciphertext} = await encryptMessage(message, key);
