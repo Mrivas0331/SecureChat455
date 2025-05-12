@@ -149,7 +149,6 @@
     console.log("received message: ", message);
     console.log("Cipher: ", message.ciphertext);
     console.log("IV: ", message.iv);
-    alert("Check if works");
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
