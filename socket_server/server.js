@@ -333,15 +333,17 @@ io.on("connection", (socket) => {
       ...user_memory.keys(),
     ]);
     socket.on("public_key", (data) => {
+      console.log(`Got this far`);
     let parsed;
     try {
       parsed = JSON.parse(data);
     } catch (e) {
       return;
     }
-
+      console.log(`Got to here for parsed: `, parsed);
     const { username, session_token, publicKey } = parsed;
     if (!verifyUserAndSession({ username, session_token })) return;
+    console.log("Got past !verify");
 
     const selfUser = user_memory.get(username);
     if (!selfUser) return;
