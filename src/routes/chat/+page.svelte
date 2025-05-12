@@ -281,6 +281,7 @@
 
     // Call after verification completes
     async function generateAndSendECDHKey() {
+      console.log("working here");
       localECDHKeyPair = await crypto.subtle.generateKey(
         { name: "ECDH", namedCurve: "P-256" },
         true,
@@ -311,9 +312,10 @@
       userOffline(username);
     });
     socket.on("public_key", async (data) => {
+      console.log(data);
       const { username: peer, publicKey } = JSON.parse(data);
       if (peer === username) return;
-
+      console.log(peer);
       const importedPeerKey = await crypto.subtle.importKey(
         "jwk",
         publicKey,
