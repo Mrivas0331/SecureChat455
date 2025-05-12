@@ -44,7 +44,7 @@
   }
 
   let chats = [];
-
+  let sessionDerivedKeys = {};
   let chatting_with = "";
 
   // Handles sending messages and files
@@ -54,7 +54,9 @@
   let send_file = () => {
     alert("wait for connection");
   };
-
+  function getCanonicalKeyID(user1, user2) {
+    return [user1, user2].sort().join('|');
+  }
   // Run when a user goes online, adds a Chat object to the chats array
   function userOnline(user, old_messages) {
     const existing = chats.find(
@@ -146,10 +148,8 @@
 
   // Run when a user sends a message, adds the message to the appropriate Chat object
   async function recvMessage(sender, reciever, message, encrypted) {
-    console.log("received message: ", message);
+    console.log(`Message received from ${sender} to ${receiver} of received message: `, message);
     console.log("Cipher: ", message.ciphertext);
-    console.log("IV: ", message.iv);
-    alert("Check if works");
     const chat = chats.find(
       (chat) =>
         (chat.user1 === sender && chat.user2 === reciever) ||
@@ -160,8 +160,14 @@
     } else if (message.iv && message.ciphertext) {
       
       try {
-        const sharedSec = prompt(`Enter shared secret from ${sender}`);
-        const key = await deriveKey(sharedSec, `${sender}|${reciever}`);
+        //const sharedSec = prompt(`Enter shared secret from ${sender}`);
+        const canonicalKeyID = getCanonicalKeyID(sender, reciever);
+        let cryptokey = sessionDerivedKeys[canonicalKeyID];
+        if (!cryptokey) { console.log(`No key cached for ${canonicalKeyID}, enter one here`)
+          const sharedSec = prompt(`Enter shared secret you have with ${sender}`);
+        }
+        cryptokey = await deriveKey(sharedSec, canonicalKeyID);
+        sessionDerivedKeys[canonicalKeyID] = cryptokey;
         const plaintext = await decryptMessage(message.ciphertext, message.iv, key);
         chat.messages.push({
         sender,
@@ -300,9 +306,16 @@
       if (!msgInputField) return;
       const message = msgInputField;
       msgInputField = "";
-      const sharedSec = prompt("Enter shared secret");
-      const key = await deriveKey(sharedSec, `${username}|${chatting_with}`);
-      const {iv, ciphertext} = await encryptMessage(message, key);
+      const canonicalKeyID = getCanonicalKeyID(username, chatting_with);
+      let cryptokey = sessionDerivedKeys[canonicalKeyID];
+      if (!cryptokey) { console.log(`No cached key for ${canonicalKeyID}, enter one here`);
+        const sharedSec = prompt(`Enter shared secret for ${chatting_with}`);
+      }
+      //const sharedSec = prompt("Enter shared secret");
+      cryptokey = await deriveKey(sharedSec, canonicalKeyID);
+      sessionDerivedKeys[canonicalKeyID] = cryptokey;
+      console.log(`Derived and cached new key for ${canonicalKeyID}`);
+      const {iv, ciphertext} = await encryptMessage(message, cryptokey);
       console.log("Sending encrypted message:", ciphertext);
       socket.emit(
         "message",
